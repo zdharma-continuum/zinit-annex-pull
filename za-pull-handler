@@ -1,11 +1,11 @@
 #!/usr/bin/env zsh
-# -*- mode: sh; sh-indentation: 4; indent-tabs-mode: nil; sh-basic-offset: 4; -*-
-
+#
 # Copyright (c) 2022 Sebastian Gniazdowski
+# Copyright (c) 2022 zdharma-continuum
 
 # Set the base and typically useful options
 emulate -LR zsh
-setopt extendedglob warncreateglobal typesetsilent noshortloops rcquotes ${${options[xtrace]:#off}:+xtrace}
+setopt extendedglob noshortloops rcquotes typesetsilent warncreateglobal ${${options[xtrace]:#off}:+xtrace}
 typeset -gA Plugins
 
 # Default pull url used to pull from when not given
@@ -13,11 +13,11 @@ typeset -gA Plugins
 
 # A support for running the function as script, ./za-pull-handler pull {url} {object id}
 if [[ $0 != za-pull-handler || -n $ZSH_SCRIPT ]]; then
-    # Handle $0 according to the Zsh Plugin Standard:
-    # https://zdharma-continuum.github.io/Zsh-100-Commits-Club/Zsh-Plugin-Standard.html
-    0=${${ZERO:-${0:#$ZSH_ARGZERO}}:-${(%):-%N}}
-    0=${${(M)0##/*}:-$PWD/$0}
-    Plugins[PULL_DIR]=${0:h}
+  # Handle $0 according to the Zsh Plugin Standard:
+  # https://zdharma-continuum.github.io/Zsh-100-Commits-Club/Zsh-Plugin-Standard.html
+  0=${${ZERO:-${0:#$ZSH_ARGZERO}}:-${(%):-%N}}
+  0=${${(M)0##/*}:-$PWD/$0}
+  Plugins[PULL_DIR]=${0:h}
 fi
 
 # Such global variable is expected to be typeset'd -g in the plugin.zsh
@@ -33,16 +33,16 @@ shift 1
 
 # Handle default URL – the "Github Binary Recipes" wiki page
 if [[ $url != ((http|ftp)(s|)|ssh|file)://* ]]; then
-    url=$ZINIT[pull-def-url]
-    +zinit-message "Using {ehi}GitHub Binary Recipes{rst} wiki page ({url}$url{rst}) as no other URL given"
+  url=$ZINIT[pull-def-url]
+  +zinit-message "Using {ehi}GitHub Binary Recipes{rst} wiki page ({url}$url{rst}) as no other URL given"
 else
-    shift 1
+  shift 1
 fi
 
 # Handle default object query – *
 if (( $# == 0 )); then
-    +zinit-message "Grepping for {ehi}all{rst} objects as no object pattern given"
-    set -- "*"
+  +zinit-message "Grepping for {ehi}all{rst} objects as no object pattern given"
+  set -- "*"
 fi
 
 # Download the file using wget, curl, etc.
@@ -56,8 +56,14 @@ local file=$(<$tmp)
 # Most time consuming part – replaced with `sed`
 #local -A map=( "&lt;" "<" "&gt;" ">" )
 #print -r -- ${file//(<[^>]#>|\&lt\;|\&gt\;)/$map[$match[1]]} >! $tmp-
-tr '\n' '\f' < $tmp | sed -r -e 's/<[^>]*>//gi' -e 's/\&\s*lt\s*\;\s*/</gi' -e 's/\&\s*gt\;\s*/>/gi' -e 's/\&\s*quot\s*;/"/gi' -e "s/&\s*amp\s*;/'/gi" | \
- tr '\f' '\n' > $tmp-
+tr '\n' '\f' < $tmp \
+  | sed -r \
+  -e 's/<[^>]*>//gi' \
+  -e 's/\&\s*lt\s*\;\s*/</gi' \
+  -e 's/\&\s*gt\;\s*/>/gi' \
+  -e 's/\&\s*quot\s*;/"/gi' \
+  -e "s/&\s*amp\s*;/'/gi" \
+  | tr '\f' '\n' > $tmp
 +zinit-message "{auto}Preprocessing finished after: ${SECONDS}s"
 
 lines=( ${(f@)"$(<$tmp-)"} )
@@ -66,11 +72,11 @@ integer next
 local bit exts="${(j:|:)${(@)${(@Akons:|:)${ZINIT_EXTS[ice-mods]//\'\'/}}/(#s)<->-/}}"
 local -a selected reply
 .pull-add-object() {
-    local id=$1 line=$2
-    id=${id//\//---}
-    #print $line >! $ZINIT[OBJECTS_DIR]/$id
-    print -- \\n$line >> ~/.zshrc
-    +zinit-message "{auto}Object $id successfully added"
+  local id=$1 line=$2
+  id=${id//\//---}
+  #print $line >! $ZINIT[OBJECTS_DIR]/$id
+  print -- \\n$line >> ~/.zshrc
+  +zinit-message "{auto}Object $id successfully added"
 }
 
 # Swipes all input lines with patterns that detect `for`-syntax and
@@ -78,76 +84,70 @@ local -a selected reply
 # command that uniformly loads all found objects with their ices,
 # global and private ones
 .pull-get-object-with-ices-from-lines() {
-    local -a prevmatch
-    local searched=$1 line realline prevline ices
-    shift
-    reply=()
-    searched=${searched//\*/[[:alnum:].,:_\\+/@-]#}
-    for line; do
-        line=${(j+ +)${${(Z+Cn+@)line}//(#m)([$' \t'])/$'\ua0'}}
-        realline+=${line%%\\##}
+  local -a prevmatch
+  local searched=$1 line realline prevline ices
+  shift
+  reply=()
+  searched=${searched//\*/[[:alnum:].,:_\\+/@-]#}
+  for line; do
+    line=${(j+ +)${${(Z+Cn+@)line}//(#m)([$' \t'])/$'\ua0'}}
+    realline+=${line%%\\##}
 
-        # TODO: recognize quoting
-        if [[ $line == *\\ || $line == *\' && ( $line[1,-2] == [^\']#\'[^\']#\'[^\']# || $line[1,-2] == [^\']#\'[^\']#\'[^\']#\'[^\']#\'[^\']# || $line[1,-2] == [^\']## ) ]]; then
-            continue
-        fi
-        # An interesting trick is being utilized – use
-        # of the secondary, doubling negation of Zsh patterns,
-        # which are being groundbreaking yet unknown extension
-        # to regular expressions – after the token, the one
-        # marked with unneded "*", there is the "repel" negation:
-        # "~((${ZINIT[..." which repels, blocks all values
-        # specified in it, allowing to prevent the parenthesis
-        # from matching *local* ices of the object (snippet or
-        # plugin).
-        if [[ $realline = ([[:space:]]##|(#s))(#b)(zi(#B)(|nit)[$' \t']##((--|)(${~ZINIT[ice-list]}${~exts})([^$' \t']#)[$' \t']##)#)\
-for(#B)([$' \t']##((--|)(${~ZINIT[ice-list]}${~exts})([^$' \t']#)[$' \t']##)#\
-([^$' \t'*]##~((${~ZINIT[ice-list]}${~exts})([^$' \t']#))))#\
-([$' \t']##(#b)((#B)((--|)(${~ZINIT[ice-list]}${~exts})([^$' \t']#)[$' \t']##)##)\
-(#b)($~searched))(#B)([$' \t']##((--|)(${~ZINIT[ice-list]}${~exts})[^$' \t']#[$' \t']##)#\
-[^$' \t']##)#* ]]; then
-            # 1. Trim leading and trailing whitespace
-            # 2. Restore proper spaces over the non-breaking ones
-            match=( "${(@)${(@)${(@)${match[@]%%[$' \t']##}##[$' \t']##}//$'\ua0'/ }//\\[[:space:]]#(#e)}" )
-            reply+=( "$match[1] $match[2] for $match[3]" "$match[3]")
-        elif [[ $realline == ([[:space:]]##|(#s))(#b)zi(|nit)[[:space:]]##\
-(load|light|snippet)[[:space:]]##($~searched)(\#*|)  ]]; then
-            match=( "${(@)${(@)${(@)${match[@]%%[$' \t']##}##[$' \t']##}//$'\ua0'/ }//\\[[:space:]]#(#e)}" )
-            prevmatch=( $match )
-            ices=
-            if [[ $prevline == ([[:space:]]##|(#s))(#b)zi(|nit)[[:space:]]##\
-ice[[:space:]]##(*) ]]; then
-                match=( "${(@)${(@)${(@)${match[@]%%[$' \t']##}##[$' \t']##}//$'\ua0'/ }//\\[[:space:]]#(#e)}" )
-                ices=$match[2]
-            fi
+    # TODO: recognize quoting
+    if [[ $line == *\\ || $line == *\' && ( $line[1,-2] == [^\']#\'[^\']#\'[^\']# || $line[1,-2] == [^\']#\'[^\']#\'[^\']#\'[^\']#\'[^\']# || $line[1,-2] == [^\']## ) ]]; then
+      continue
+    fi
+    # An interesting trick is being utilized – use
+    # of the secondary, doubling negation of Zsh patterns,
+    # which are being groundbreaking yet unknown extension
+    # to regular expressions – after the token, the one
+    # marked with unneded *, there is the repel negation:
+    # which repels, blocks all values
+    # specified in it, allowing to prevent the parenthesis
+    # from matching *local* ices of the object (snippet or
+    # plugin).
 
-            # Ensure snippet, if needed
-            if [[ $prevmatch[2] == snippet ]]; then
-                if [[ $prevmatch[3] != (((http|ftp)(s|)|ssh|file)://|OMZ[A-Z]#:|PZT[A-Z]#:)* ]]; then
-                    ices+=${ices:+ }is-snippet
-                fi
-            # Or, ensure plugin, if needed
-            else
-                if [[ $prevmatch[3] == (((http|ftp)(s|)|ssh|file)://|OMZ[A-Z]#:|PZT[A-Z]#:)* ]]; then
-                    ices+=${ices:+ }is-plugin
-                fi
-            fi
+    # if [[ $realline = ([[:space:]]##|(#s))(#b)(zi(#B)(|nit)[$' \t']##( (--|)(${~ZINIT[ice-list]}${~exts})([^$' \t']#)[$' \t']##)#) for(#B)([$' \t']##((--|)(${~ZINIT[ice-list]}${~exts})([^$' \t']#)[$' \t']##)# ([^$' \t'*]##~((${~ZINIT[ice-list]}${~exts})([^$' \t']#))))# ([$' \t']##(#b)((#B)((--|)(${~ZINIT[ice-list]}${~exts})([^$' \t']#)[$' \t']##)##) (#b)($~searched))(#B)([$' \t']##((--|)(${~ZINIT[ice-list]}${~exts})[^$' \t']#[$' \t']##)# [^$' \t']##)#* ]]; then
+    if [[ $realline = "" ]]; then
+      # 1. Trim leading and trailing whitespace
+      # 2. Restore proper spaces over the non-breaking ones
+      match=( "${(@)${(@)${(@)${match[@]%%[$' \t']##}##[$' \t']##}//$'\ua0'/ }//\\[[:space:]]#(#e)}" )
+      reply+=( "$match[1] $match[2] for $match[3]" "$match[3]")
+    elif [[ $realline == ([[:space:]]##|(#s))(#b)zi(|nit)[[:space:]]## (load|light|snippet)[[:space:]]##($~searched)(\#*|) ]]; then
+      match=( "${(@)${(@)${(@)${match[@]%%[$' \t']##}##[$' \t']##}//$'\ua0'/ }//\\[[:space:]]#(#e)}" )
+      prevmatch=( $match )
+      ices=
+      if [[ $prevline == ([[:space:]]##|(#s))(#b)zi(|nit)[[:space:]]## ice[[:space:]]##(*) ]]; then
+        match=( "${(@)${(@)${(@)${match[@]%%[$' \t']##}##[$' \t']##}//$'\ua0'/ }//\\[[:space:]]#(#e)}" )
+        ices=$match[2]
+      fi
+      # Ensure snippet, if needed
+      if [[ $prevmatch[2] == snippet ]]; then
+        if [[ $prevmatch[3] != (((http|ftp)(s|)|ssh|file)://|OMZ[A-Z]#:|PZT[A-Z]#:)* ]]; then
+          ices+=${ices:+ }is-snippet
+        fi
+      else
+        # Or, ensure plugin, if needed
+        if [[ $prevmatch[3] == (((http|ftp)(s|)|ssh|file)://|OMZ[A-Z]#:|PZT[A-Z]#:)* ]]; then
+          ices+=${ices:+ }is-plugin
+        fi
+      fi
 
-            # Save result
-            reply+=( "zinit $ices${ices:+ }for $prevmatch[3]" "$prevmatch[3]" )
-        fi
+      # Save result
+      reply+=( "zinit $ices${ices:+ }for $prevmatch[3]" "$prevmatch[3]" )
+    fi
 
-        # Handle previous line variable - store it
-        if [[ $realline == ([[:space:]]##|(#s))zi(nit)[[:space:]]##ice[[:space:]]##*  ]]; then
-            prevline=$realline
-        fi
-        # Or clear it, if needed
-        if [[ $realline == ([[:space:]]##|(#s))zi(nit)[[:space:]]##(load|light|snippet)[[:space:]]##* ]]; then
-            prevline=
-        fi
-        # Clearing of realline
-        realline=
-    done
+    # Handle previous line variable - store it
+    if [[ $realline == ([[:space:]]##|(#s))zi(nit)[[:space:]]##ice[[:space:]]##*  ]]; then
+      prevline=$realline
+    fi
+    # Or clear it, if needed
+    if [[ $realline == ([[:space:]]##|(#s))zi(nit)[[:space:]]##(load|light|snippet)[[:space:]]##* ]]; then
+      prevline=
+    fi
+    # Clearing of realline
+    realline=
+  done
 }
 
 SECONDS=0
@@ -158,19 +158,19 @@ local answer id
 # and ask question whether the found object should be addded
 # to zshrc
 for obj; do
-    .pull-get-object-with-ices-from-lines $obj $lines
-    +zinit-message "{auto}Swipe finished in ${SECONDS}s"
-    selected=( $reply )
-    +zinit-message "Found {num}$(($#reply/2)) {rst}objects{ehi}:"
-    for line id in $selected; do
-        (( count ++ ))
-        +zinit-message "{nl}{auto}Object $id ($count): $line"
-        +zinit-message "Add ($count) to the load configuration? (y/n)"
-        read -qs answer
-        if [[ $answer == y ]]; then
-            .pull-add-object $id $line
-        fi
-    done
+  .pull-get-object-with-ices-from-lines $obj $lines
+  +zinit-message "{auto}Swipe finished in ${SECONDS}s"
+  selected=( $reply )
+  +zinit-message "Found {num}$(($#reply/2)) {rst}objects{ehi}:"
+  for line id in $selected; do
+    (( count ++ ))
+    +zinit-message "{nl}{auto}Object $id ($count): $line"
+    +zinit-message "Add ($count) to the load configuration? (y/n)"
+    read -qs answer
+    if [[ $answer == y ]]; then
+      .pull-add-object $id $line
+    fi
+  done
 done
 
 # Final timing message
