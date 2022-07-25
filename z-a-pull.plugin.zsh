@@ -22,4 +22,3 @@ za-pull-null-handler() { :; }
     subcommand:pull \
     za-pull-handler \
     za-pull-null-handler
-
