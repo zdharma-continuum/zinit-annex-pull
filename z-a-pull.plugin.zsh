@@ -18,7 +18,7 @@ autoload za-pull-handler
 # An empty stub to fill the help handler fields
 za-pull-null-handler() { :; }
 
-@zinit-register-annex "zinit-annex-pull" \
+@zi::register-annex "zinit-annex-pull" \
     subcommand:pull \
     za-pull-handler \
     za-pull-null-handler
