@@ -34,14 +34,14 @@ shift 1
 # Handle default URL – the "Github Binary Recipes" wiki page
 if [[ $url != ((http|ftp)(s|)|ssh|file)://* ]]; then
     url=$ZINIT[pull-def-url]
-    +zinit-message "Using {ehi}GitHub Binary Recipes{rst} wiki page ({url}$url{rst}) as no other URL given"
+    +zi::message "Using {ehi}GitHub Binary Recipes{rst} wiki page ({url}$url{rst}) as no other URL given"
 else
     shift 1
 fi
 
 # Handle default object query – *
 if (( $# == 0 )); then
-    +zinit-message "Grepping for {ehi}all{rst} objects as no object pattern given"
+    +zi::message "Grepping for {ehi}all{rst} objects as no object pattern given"
     set -- "*"
 fi
 
@@ -49,7 +49,7 @@ fi
 # using function from zinit-install.zsh
 #wget $url -O $tmp &>/dev/null
 source $ZINIT[BIN_DIR]/zinit-install.zsh
-.zinit-download-file-stdout $url >! $tmp
+zi::download-file-stdout $url >! $tmp
 
 # Strip tags, etc.
 local file=$(<$tmp)
@@ -58,7 +58,7 @@ local file=$(<$tmp)
 #print -r -- ${file//(<[^>]#>|\&lt\;|\&gt\;)/$map[$match[1]]} >! $tmp-
 tr '\n' '\f' < $tmp | sed -r -e 's/<[^>]*>//gi' -e 's/\&\s*lt\s*\;\s*/</gi' -e 's/\&\s*gt\;\s*/>/gi' -e 's/\&\s*quot\s*;/"/gi' -e "s/&\s*amp\s*;/'/gi" | \
  tr '\f' '\n' > $tmp-
-+zinit-message "{auto}Preprocessing finished after: ${SECONDS}s"
++zi::message "{auto}Preprocessing finished after: ${SECONDS}s"
 
 lines=( ${(f@)"$(<$tmp-)"} )
 
@@ -70,7 +70,7 @@ local -a selected reply
     id=${id//\//---}
     #print $line >! $ZINIT[OBJECTS_DIR]/$id
     print -- \\n$line >> ~/.zshrc
-    +zinit-message "{auto}Object $id successfully added"
+    +zi::message "{auto}Object $id successfully added"
 }
 
 # Swipes all input lines with patterns that detect `for`-syntax and
@@ -159,13 +159,13 @@ local answer id
 # to zshrc
 for obj; do
     .pull-get-object-with-ices-from-lines $obj $lines
-    +zinit-message "{auto}Swipe finished in ${SECONDS}s"
+    +zi::message "{auto}Swipe finished in ${SECONDS}s"
     selected=( $reply )
-    +zinit-message "Found {num}$(($#reply/2)) {rst}objects{ehi}:"
+    +zi::message "Found {num}$(($#reply/2)) {rst}objects{ehi}:"
     for line id in $selected; do
         (( count ++ ))
-        +zinit-message "{nl}{auto}Object $id ($count): $line"
-        +zinit-message "Add ($count) to the load configuration? (y/n)"
+        +zi::message "{nl}{auto}Object $id ($count): $line"
+        +zi::message "Add ($count) to the load configuration? (y/n)"
         read -qs answer
         if [[ $answer == y ]]; then
             .pull-add-object $id $line
@@ -174,5 +174,5 @@ for obj; do
 done
 
 # Final timing message
-+zinit-message "{auto}Operation finished in ${SECONDS}s"
++zi::message "{auto}Operation finished in ${SECONDS}s"
 # vim:ft=zsh:tw=80:sw=4:sts=4:et:foldmarker=[[[,]]]
